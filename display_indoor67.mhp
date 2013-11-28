@@ -1,0 +1,11 @@
+<table>
+<%for(i=1:67)%>
+  <tr><td colspan="10"><h3 style="margin-top:20px;margin-bottom:2px;"><a stlye="dext-decoration:none;" href="../display_<%=argv.classnames{i}%>/displayhtml.html"><%=argv.classnames{i}%></a><hr style="margin:0px;"/></td></tr>
+  <tr>
+  <%for(j=1:10)%><td><img src="patchimg[]/<%=20*(i-1)+j%>.jpg"/></td><%end%>
+  </tr>
+  <tr>
+  <%for(j=11:20)%><td><img src="patchimg[]/<%=20*(i-1)+j%>.jpg"/></td><%end%>
+  </tr>
+
+<%end%>

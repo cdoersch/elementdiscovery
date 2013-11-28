@@ -1,0 +1,22 @@
+function res=effstridx(str,idx,expand)
+  if(nargin<3)
+    expand=false;
+  end
+  if(~isstruct(str))
+    if(numel(str)==1)
+      if(expand)
+        res=repmat(str,numel(idx),1);
+      else
+        res=str;
+      end
+    else
+      res=str(idx,:);
+    end
+  else
+    res=struct();
+    fnms=fieldnames(str);
+    for(i=1:numel(fnms))
+      res=setfield(res,fnms{i},effstridx(getfield(str,fnms{i}),idx,expand));
+    end
+  end
+end

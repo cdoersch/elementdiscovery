@@ -1,0 +1,48 @@
+<html><body>
+<%if(isfield(argv,'mainimgs'))%>
+  <table><tr>
+    <%for(i=1:numel(argv.mainimgs))%>
+      <td><img src="<%=argv.mainimgs{i}%>"/></td>
+    <%end%>
+  </tr></table>
+<%end%>
+<table>
+<% 
+if(~isfield(argv,'ovlweights'))
+  argv.ovlweights=zeros(size(argv.dets(:,[])));
+end
+[dets,posinpatchimg,ovlweights,detid]=distributeby(argv.dets,(1:size(argv.dets,1))',argv.ovlweights,argv.dets(:,6));
+if(isfield(argv,'detrord'))
+  [~,idxord]=ismember(argv.detrord,detid);
+else
+  idxord=1:numel(detid);
+  argv.detrord=detid;
+end
+if(~isfield(argv,'message'))
+  argv.message=repmat({''},numel(argv.detrord),1);
+end
+gbz=dsload('ds.conf.gbz{ds.conf.currimset}');
+imgs=dsload('.ds.imgs{ds.conf.currimset}');
+if(~isfield(gbz,'imgsurl'))
+  gbz.imgsurl='';
+end
+for(i=1:numel(idxord)) %>
+  <tr><td>detector no. <%=argv.detrord(i)%> <br/> <%=argv.message{i}%></td>
+  <%if(idxord(i) ~= 0)
+    curdets=dets{idxord(i)};
+    curpos=posinpatchimg{idxord(i)};
+    curwt=ovlweights{idxord(i)};
+    [~,ord]=sort(curdets(:,5),'descend');
+    for(j=1:size(curdets,1)) %>
+      <td>
+        <a href="<%if(isfield(argv,'url'))%><%=argv.url{curpos(ord(j))}%><%else%><%=gbz.imgsurl%>/<%=imgs.fullname{curdets(ord(j),7)}%><%end%>">
+          <img src="patchimg[]/<%=curpos(ord(j))%>.jpg" title="<%=curdets(ord(j),5)%> <%=curwt(ord(j),:)%>"/>
+        </a>
+      </td>
+    <%end
+  end%>
+  </tr>
+<%end%>
+      
+</table>
+</body></html>

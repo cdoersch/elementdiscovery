@@ -1,0 +1,13 @@
+<html><body>
+<table>
+  <%for(i=1:numel(ds.todisp)) %>
+    <tr>
+      <td><img src="<%~ds.origimg{i}%>"/></td>
+      <td><a href="<%='display_left_' num2str(i) '_pos/displayhtml.html'%>"><img src="<%~ds.leftposimg{i}%>"/></a><br/><%if(~argv.iserror)%>top guess<%else%>ground truth<%end%> (pos) (confindence <%=argv.confidence(i)%>):<%=argv.trueclasses{i}%></td>
+      <td><a href="<%='display_left_' num2str(i) '_neg/displayhtml.html'%>"><img src="<%~ds.leftnegimg{i}%>"/></a><br/><%if(~argv.iserror)%>top guess<%else%>ground truth<%end%> (neg):<%=argv.trueclasses{i}%></td>
+      <td><a href="<%='display_right_' num2str(i) '_pos/displayhtml.html'%>"><img src="<%~ds.rightposimg{i}%>"/></a><br/><%if(~argv.iserror)%>second guess<%else%>guess<%end%> (pos):<%=argv.guessclasses{i}%></td>
+      <td><a href="<%='display_right_' num2str(i) '_neg/displayhtml.html'%>"><img src="<%~ds.rightnegimg{i}%>"/></a><br/><%if(~argv.iserror)%>second guess<%else%>guess<%end%> (neg):<%=argv.guessclasses{i}%></td>
+    </tr>
+  <%end %>
+</table>
+</body></html>
