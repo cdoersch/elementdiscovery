@@ -1,0 +1,3 @@
+[submodule "dswork"]
+	path = dswork
+	url = git://github.com/cdoersch/dswork.git
