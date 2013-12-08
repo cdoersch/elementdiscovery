@@ -97,7 +97,6 @@ end
 % load the actual detectors.
 ctrs=dsload(['ds.round.detectors{' num2str(dsidx) '}'],'clear');
 newctrs=zeros(size(ctrs));
-resfeat={};
 resdets={};
 
 ds.round.newfeat={};
@@ -145,7 +144,7 @@ if(dsfield(ds,'sys','distproc','localdir'))
   prevfeats=feats;
   save([ds.sys.distproc.localdir 'prevfeats' num2str(dsidx) '_' num2str(ds.round.roundid) '.mat'],'prevfeats');
 else
-  ds.nextround.prevfeats{dsidx}=resfeat;
+  ds.nextround.prevfeats{dsidx}=feats;
 end
 ds.nextround.detectors{dsidx}=effstrcell2mat(newctr);
 

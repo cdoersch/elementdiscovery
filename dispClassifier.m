@@ -2,8 +2,14 @@
 % the image that were most influential.  Basically finds which dimensions
 % of the image descriptor were most influential and back-projects them to
 % the max firing within each region of the spatial pyramid.  Note that this
-% tends to generate a sparse representation of textured regions; I could
-% probably do better, but there was no time.
+% tends to generate a sparse representation of textured regions.  This is
+% different from the visualization on the website, (that one does more to smooth
+% the detections and counts all detections, rather than just the max ones).
+%
+% Note that you may need to adjust the scaling of the contributions on
+% lines 108-109 before the heatmaps look good.  This function does not do
+% that adjustment automatically because we want the heatmap values to be
+% comparable across images.
 %
 % detr: element detectors
 % im: image
@@ -101,8 +107,13 @@ global ds;
     
     feature=feature(:);
     im=repmat(rgb2gray(im),[1,1,3]);
-    posheatmap=heatmap2jet(posheatmap*40000)*.5+im*.5;
-    negheatmap=heatmap2jet(negheatmap*40000)*.5+im*.5;
+    if(dsbool(ds.conf.params,'ovlweight'))
+      weight=1000;
+    else
+      weight=2000;
+    end
+    posheatmap=heatmap2jet(posheatmap*weight)*.5+im*.5;
+    negheatmap=heatmap2jet(negheatmap*weight)*.5+im*.5;
 catch ex,dsprinterr;end
 end
 

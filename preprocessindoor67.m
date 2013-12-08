@@ -63,5 +63,5 @@ for(imset=1:2)
   imgs=str2effstr(imgs);
   labelnames=sort(unique(imgs.label));
   [~,imgs.label]=ismember(imgs.label,labelnames);
-  save(datasetname{i},'imgs','labelnames');
+  save(datasetfiles{imset},'imgs','labelnames');
 end

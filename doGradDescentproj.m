@@ -349,7 +349,7 @@ while(nprods<optimizationComputeLimit && nrmstep > 1e-8 && nquadmins<10)
       end
     end
     % print out a bunch of debug info.
-    if(mod(i,10)==0||nprods>=optimizationComputeLimit)
+    if(mod(i,25)==0||nprods>=optimizationComputeLimit)
       disp(['done: ' num2str(i) ' ' num2str(toc) ' seconds']);
       disp(['lminus:' num2str(lminus)]);
       disp(['w_end:' num2str(w(end))]);

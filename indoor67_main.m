@@ -4,7 +4,6 @@ finishedinit=false;
 try,finishedinit=dsload('.ds.finishedinit');catch,end
 if(~finishedinit)
   dscd('.ds');
-  dsdelete('ds.*');
   % Edit the following with your path to the indoor67 data.  This
   % directory should contain directories for airport_inside, artstudio,
   % etc.
@@ -16,12 +15,23 @@ if(~finishedinit)
   % but some links in the displays will be broken.
   weburl='';
 
+  % set an output directory (on a filesystem that's accessible to all matlab's)
+  dssetout('/PATH/TO/OUTPUT');
+  % If you're running distributed and want to use SSH to send data between
+  % nodes, use the following to set a directory where dswork can cache
+  % files locally.  On Starcluster, /mnt/sgeadmin is a good place (assuming
+  % you run your jobs as the user sgeadmin).
+  %dssetlocaldir('/mnt/sgeadmin/');
+
+  % reset the data store
+  dsdelete('ds.*');
+
   % Set the number of parallel workers:
   njobs=12;
   % Set the amount of memory on each machine; dswork will estimate
   % how many jobs can be run simultaneously on each machine
   % based on this value.  Note that if you're running jobs alongside
-  % the master, leave about 4GB for the master process
+  % the master, leave about 8GB for the master process
   ds.conf.mempermachine=59;
   % The machine where qsub can be run, or 'local' if you want to run on
   % a single machine:
@@ -32,20 +42,11 @@ if(~finishedinit)
 
   ds.masterscriptname=mfilename;
 
-  % set an output directory (on a filesystem that's accessible to all matlab's)
-  dssetout('/PATH/TO/OUTPUT');
-  % If you're running distributed and want to use SSH to send data between
-  % nodes, use the following to set a directory where dswork can cache
-  % files locally.  On Starcluster, /mnt/sgeadmin is a good place (assuming
-  % you run your jobs as the user sgeadmin).
-  %dssetlocaldir('/mnt/sgeadmin/');
-
-
   if(~exist('dataset_indoor67_jpg.mat','file'))
     disp(['WARNING: you are about to create jpeg versions of the gifs in the indoor67 data directory.  '...
           'type ''return'' to continue or ''dbquit'' to cancel.']);
     keyboard
-    preprocessindoor67(indoor67path,{'dataset_indoor67_test.mat','dataset_indoor67_jpg.mat'});
+    preprocessindoor67(indoor67path,{'dataset_indoor67_jpg.mat','dataset_indoor67_test.mat'});
   end
   testdata=load('dataset_indoor67_test.mat');
   setdataset(20,testdata.imgs,indoor67path,testdata.labelnames,weburl);
@@ -56,7 +57,8 @@ if(~finishedinit)
   if(isfield(ds.conf.gbz{ds.conf.currimset},'imgsurl'))
     ds.imgsurl=ds.conf.gbz{ds.conf.currimset}.imgsurl;
   end
-  rand('seed',1234)
+  s = RandStream('mcg16807','Seed',1234)
+  RandStream.setDefaultStream(s) 
   ds.conf.params= struct( ...
     'ovlweight', 1, ... % use the inter-element communication scheme to set the weights.
     'negsperpos', 8, ... % during element training, the number of images we hard-mine 
@@ -83,8 +85,8 @@ if(~finishedinit)
     'multperim', 1, ... % allow multiple detections per image
     'nmsOverlapThreshold', 0.4 ... % overlap threshold for NMS during detection.
     )
-  if(~dsbool(ds.conf.params,'ovlweight'))
-    ds.conf.params.lambdainit=.002;% lambda value for the optimization used during the first 
+  if(dsbool(ds.conf.params,'ovlweight'))
+    ds.conf.params.lambdainit=.004;% lambda value for the optimization used during the first 
                         % training round (gets increased proportional to the number 
                         % of samples at later training rounds)
   else
@@ -124,6 +126,7 @@ if(~finishedinit)
     end
     ds.roundinds{i}=ds.roundinds{i}(randperm(numel(ds.roundinds{i})));
   end
+  dssave;
   if(~dsmapredisopen())
     dsmapredopen(njobs,targmachine,distprocconf);
     disp('waiting 10 sec for mapreducers to start...')
@@ -134,7 +137,7 @@ if(~finishedinit)
   ds.aggcov.myiminds=ds.myiminds(rp(1:min(numel(rp),1500)));;
   dssave;
   dscd('ds.aggcov');
-  dsrundistributed('aggregate_covariance',{'ds.myiminds'},struct('allatonce',1,'noloadresults',1,'maxperhost',max(1,floor(ds.mempermachine/4))));
+  dsrundistributed('aggregate_covariance',{'ds.myiminds'},struct('allatonce',1,'noloadresults',1,'maxperhost',max(1,floor(ds.conf.mempermachine/4))));
   total=0;
   clear featsum dotsum;
   dsload('ds.n');
@@ -176,7 +179,7 @@ if(~initmodes)
   disp('sampling positive patches');
   dscd('.ds');
   setdataset(19);
-  dsdelete('ds.round*');
+  dsdelete('ds.round');
   dsdelete('ds.sample');
   dsdelete('ds.classperbatch');
   dsdelete('ds.detectors');
@@ -189,7 +192,7 @@ if(~initmodes)
   initPatsExtra=[];
   ds.sample=struct();
   ds.sample.initInds=ds.myiminds;
-  dsrundistributed('[ds.sample.patches{dsidx}, ds.sample.feats{dsidx}]=sampleRandomPatchesbb(ds.sample.initInds(dsidx),20);',{'ds.sample.initInds'},struct('maxperhost',max(1,floor(ds.mempermachine/4))));
+  dsrundistributed('[ds.sample.patches{dsidx}, ds.sample.feats{dsidx}]=sampleRandomPatchesbb(ds.sample.initInds(dsidx),20);',{'ds.sample.initInds'},struct('maxperhost',max(1,floor(ds.conf.mempermachine/4))));
 
   % divide the sampled patches into batches (two images' worth of sampled
   % patches per batch).  The batches are purely for efficiency, specifically
@@ -226,7 +229,7 @@ if(~initmodes)
   ds.initPatches=initPatches;
   % batchfordetr is an n-by-2 detector for the n detectors: column 1 is
   % a detector id, column 2 is the index of the batch containing it.
-  marks=zeros(1:size(ds.initFeats,1),1);
+  marks=zeros(size(ds.initFeats,1),1);
   marks(cumsum(batchsz)+1)=1;
   marks(end)=[];
   marks(1)=1;
@@ -241,7 +244,7 @@ if(~initmodes)
   % initialize the set of detectors: this will only update the b value.
   ds.initFeats=[];
   runset=ds.sys.distproc.availslaves;
-  dsrundistributed('autoclust_opt_init',{'ds.detectors'},struct('noloadresults',1,'maxperhost',max(1,floor(ds.mempermachine/4)),'forcerunset',runset));
+  dsrundistributed('autoclust_opt_init',{'ds.detectors'},struct('noloadresults',1,'maxperhost',max(1,floor(ds.conf.mempermachine/4)),'forcerunset',runset));
 end
 ds.initmodes=true;
 dssave;
@@ -282,11 +285,11 @@ if(~trainingrounds)
         ds.round.detrgroup=[ds.batchfordetr(:,1), (1:size(ds.batchfordetr,1))'];
       end
       if(roundid<=3)
-        mph=max(1,floor(ds.mempermachine/4));
+        mph=max(1,floor(ds.conf.mempermachine/8));
       elseif(roundid<=4)
-        mph=max(1,floor(ds.mempermachine/2));
+        mph=max(1,floor(ds.conf.mempermachine/2));
       else
-        mph=max(1,floor(ds.mempermachine/1.5));
+        mph=max(1,floor(ds.conf.mempermachine/1.5));
       end
       if(mod(roundid,1)==0)
         % matlab's memory footprint grows even if it's not using the memory; restarting frees it.
@@ -330,8 +333,13 @@ if(~trainingrounds)
                      '[dets,feats,ovlweight,outpos]=distributeby(dets,single(feats),ovlweight,ctridx(ctrpos,2));'...
                      'ds.round.newfeat(outpos,dsidx)=cellfun(@(x,y,z) struct(''assignedidx'',x,''feat'',y,''ovlweights'',z),dets,feats,ovlweight,''UniformOutput'',false);'...
                    'end']...
-                  ,'autoclust_optimize',{'ds.round.myiminds'},'ds.round.newfeat',struct('noloadresults',1,'forcerunset',runset),struct('maxperhost',mph),struct('maxperhost',max(1,floor(ds.mempermachine/4))));
+                  ,'autoclust_optimize',{'ds.round.myiminds'},'ds.round.newfeat',struct('noloadresults',1,'forcerunset',runset),struct('maxperhost',mph),struct('maxperhost',max(1,floor(ds.conf.mempermachine/4))));
     end
+    ds.round.thisroundmapreduce=true;
+    dssave;
+    % deleting prevfeats is optional (and prevents you from backing up), but
+    % they take up a ton of space.
+    dsdelete('ds.round.prevfeats');
     dsdelete('ds.round.component');
     dsdelete('ds.nextround.detrgroup');
     dsdelete('ds.nextround.reweights');
@@ -340,7 +348,7 @@ if(~trainingrounds)
 
     % Now that we've trained the detectors, we need to re-compute the
     % alpha values for each patch.
-    if(roundid>=4 && dsbool(ds.conf.params,'ovlweight'))
+    if(roundid>=4)
       
       % findOverlapping3 finds overlapping clusters--i.e. it performs
       % the agglomerative element clustering step described in the paper.
@@ -348,7 +356,7 @@ if(~trainingrounds)
                         '[~,~,ds.round.component{dsidx}]='...
                         'findOverlapping3(''ds.nextround.prevdets'',find(ds.classperbatch==ds.uniquelabels(dsidx)),'...
                         '[ds.batchfordetr(:,1),ds.classperbatch(ds.batchfordetr(:,2))],'...
-                        'struct(''ndetsforoverlap'',.5,''maxoverlaps'',3,''clusterer'',''agglomerative''))'],'ds.uniquelabels',struct('maxperhost',max(1,floor(ds.mempermachine/3))));
+                        'struct(''ndetsforoverlap'',.5,''maxoverlaps'',3,''clusterer'',''agglomerative''))'],'ds.uniquelabels',struct('maxperhost',max(1,floor(ds.conf.mempermachine/3))));
 
       % Construct the detrgroup matrix, which is an two-column matrix,  The left column
       % is the detector id, the right column specifies which cluster that element
@@ -436,9 +444,8 @@ if(~trainingrounds)
     end
     ds.round=struct();
     dsmv('ds.round',['ds.round' num2str(roundid)]);
-    if(roundid>4)
-      dsdelete(['ds.round' num2str(roundid)]);
-    end
+    %optionally, delete the rounds as we go along to save space.
+    dsdelete(['ds.round' num2str(roundid)]);
     dsmv('ds.nextround','ds.round');%keep the stub--it's how we measure progress!
     roundid=roundid+1;
   end
@@ -474,7 +481,7 @@ if(~gendpoolfeats)
     'end,'...
     '[ds.finids{dsidx},ds.scores{dsidx}]=greedySelectDetrsCoverage(detsbyround,ds.imgs{ds.conf.currimset}.label==ds.uniquelabels(dsidx),.7,200,struct(''useoverlap'',1));'...
     'ds.newdets={}'...
-    ],'ds.uniquelabels',struct('maxperhost',max(1,floor(ds.mempermachine/4))));
+    ],'ds.uniquelabels',struct('maxperhost',max(1,floor(ds.conf.mempermachine/4))));
 
   % Collect detections from the held out detectors and generate
   % a display for each class.  Note that this display isn't the same
@@ -520,8 +527,14 @@ if(~gendpoolfeats)
   ds.mytestinds=1:numel(ds.imgs{ds.conf.currimset}.fullname);
   dsrundistributed('dsload(''ds.finmodel'');ds.testpoolfeats{dsidx}=distGenPooledFeats(ds.finmodel,ds.mytestinds(dsidx))',{'ds.mytestinds'},struct('noloadresults',true));
 end
-setdataset(19);
+ds.gendpoolfeats=true;
+dssave;
+setdataset(20);
 dscd('.ds');
+
+%clear some memory
+ds.round=struct();
+dsmapredrestart;
 
 % optionally load the ifv features generated by Junega, Vedaldi, Jawahar & 
 % Zisserman 2013's implementation of ifv.  Note that that this takes about
@@ -566,11 +579,11 @@ else
   ifvkern=0;
   ifvtestkern=0;
   if(dsbool(ds.conf.params,'ovlweight'))
-    pfwt=.012;
-    thresh=.7;
+    pfwt=.02;
+    thresh=.5;
     ifvwt=0;
   else
-    pfwt=.2;
+    pfwt=.05;
     thresh=.3;
     ifvwt=0;
   end

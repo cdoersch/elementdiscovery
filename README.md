@@ -38,9 +38,12 @@ General setup:
    the code in the clipper directory--i.e. cd into the directory and run
    "mex greedySelectDetrsCoveragemex.cpp clipper.hpp clipper.cpp"
 
-6) Make the .matlab folder in your home directory read-only--i.e. 'chmod -R 555 ~/.matlab'.
-   The code may work without this, but by default matlab writes a toolbox cache file
-   to the home directory when it starts up.  If many matlabs start at the same time,
+6) Disable the matlab toolbox cache, either in settings->General->uncheck "Enable toolbox path cache"--
+   and exiting matlab to save your changes--,
+   or by modifying .matlab/VERSION/matlab.prf and adding the line "GeneralUseToolboxCache=Bfalse"
+   (or changing the line for GeneralUseToolboxCache if it exists).
+   The code may work without this change, but by default matlab writes a toolbox cache file
+   to the home directory when it exits.  If many matlabs exit at the same time,
    they can corrupt this file and cause some matlab processes to error out.  The dswork
    code restarts the workers occasionally, which means the execution will get stuck if
    matlab can no longer start properly.
