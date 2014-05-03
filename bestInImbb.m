@@ -10,7 +10,12 @@ function [posall,distall,clustidall,featsall,flipall,boxidall]=bestInIm(centers,
   if(~dsfield(conf,'thresh'))
     conf.thresh=-Inf;
   end
-  imfull=im2double(getimg(imid));
+  if(numel(imid)<=2)
+    imfull=im2double(getimg(imid));
+  else
+    imfull=im2double(imid);
+  end
+
   noprocess=0;
   boxidall=[];
   flipall=[];
@@ -59,7 +64,13 @@ function [posall,distall,clustidall,featsall,flipall,boxidall]=bestInIm(centers,
     pcs=round(ds.conf.params.patchCanonicalSize/ds.conf.params.sBins)-2;
     pcs(3)=size(pyramid.features{1},3);
     pcs(4)=0;
-    conf.imid=imid;
+    if(numel(imid)>2)
+      if(~isfield(conf,'imid'))      
+        conf.imid=0
+      end
+    else
+      conf.imid=imid;
+    end
     % unentangling the fieature pyramid gives us 'features', where each row
     % is the feature vector for a single patch.  levels and indexes specify
     % where those patches were in the pyramid, and gradsums tells us the strength
