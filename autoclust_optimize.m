@@ -1,3 +1,4 @@
+try
 dsload('ds.batchfordetr');
 dsload('ds.classperbatch');
 imgs=dsload('ds.imgs{ds.conf.currimset}');
@@ -126,6 +127,7 @@ for(i=1:numel(mydetrs))
   % on the next round, and the round after that it will fire all over the place.
   thr=sort(scores,'descend');
   thr=min(-.02/dsload('ds.round.ndetrounds'),thr(min(ceil(size(ctr.w,2)/5),numel(thr))));
+  if(scores(1)<0&&dsload('ds.round.roundid')<4),error('candidate patch died early.');end
   scores(1)=Inf;%make sure we keep the first one, since the rest of the code assumes it's there.
   feats{i}=feats{i}((scores>=thr)',:);
   dets{i}=dets{i}(scores>=thr,:);
@@ -152,3 +154,4 @@ dssave();
 ds.nextround=struct();
 ds.round=struct();
 ds.newdets={};
+catch ex,dsprinterr;end

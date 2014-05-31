@@ -1,11 +1,6 @@
-% This file is intended to run the indoor67 experiment and reproduce
-% the results from the paper and website.  If you want to modify
-% the experiment, however, I recommend starting with 
-% indoor67_main_singleclass.m, since that file contains newer code
-% that deals with unbalanced classes, classes that are used only
-% as negatives, etc.  Even better, diffing the two files will give you a 
-% good idea of where you need to make changes for your particular
-% dataset.
+% The same as indoor67_main.m, but it only runs the 'bowling'
+% category.
+
 global ds;
 myaddpath;
 finishedinit=false;
@@ -103,6 +98,9 @@ if(~finishedinit)
                                    % regularization.
   end
 
+  classtorun='bowling';
+  [~,classidxtorun]=ismember(classtorun,ds.conf.gbz{ds.conf.currimset}.labelnames);
+
 
   %pick which images to use out of the dataset
   imgs=ds.imgs{ds.conf.currimset};
@@ -198,53 +196,68 @@ if(~initmodes)
   dsdelete('ds.initPatches');
   dsdelete('ds.batchfordetr');
   dsdelete('ds.trainingrounds');
+  dsdelete('ds.negprobperlabel');
+  ulabels=unique(imgs.label);
+  for(i=1:numel(ulabels))
+    ds.negprobperlabel(ulabels(i))=ds.conf.params.negsperpos*sum(imgs.label(ds.myiminds)==ulabels(i))/sum(imgs.label(ds.myiminds)~=ulabels(i));
+  end
   extrparams=ds.conf.params;
   ds.sample=struct();
-  ds.sample.initInds=ds.myiminds;
+  % Use this line to sample patches evenly from every image.
+  % ds.sample.initInds=ds.myiminds;
+  % alternatively, sample from just a few categories.  If you just want to sample candidate patches from a few categories,
+  % note that you also need to sample some from negative images, just so that each patch detector will start with a few negatives.
+  % I recommend around 4,000 negative patches to start off.
+  positive_indices = ds.myiminds(imgs.label(ds.myiminds) == classidxtorun);
+  negative_indices = ds.myiminds(imgs.label(ds.myiminds) ~= classidxtorun);
+  rp=randperm(numel(negative_indices));
+  ds.sample.initInds=[positive_indices, negative_indices(rp(1:200))];
   dsrundistributed('[ds.sample.patches{dsidx}, ds.sample.feats{dsidx}]=sampleRandomPatchesbb(ds.sample.initInds(dsidx),20);',{'ds.sample.initInds'},struct('maxperhost',max(1,floor(ds.conf.mempermachine/4))));
 
   % divide the sampled patches into batches (two images' worth of sampled
   % patches per batch).  The batches are purely for efficiency, specifically
   % to limit the number of files that get written.  Note that each
-  % batch needs to have a single class label.  The following code makes
-  % very strong assumptions about the way the patches were sampled!
-  % Look at indoor67_main_oneclass.m for a more general way to do this.
-  batchsz=cellfun(@(x) size(x,1),ds.sample.patches)';
-  ds.classperbatch=ds.imgs{ds.conf.currimset}.label(ds.sample.initInds);
-  [batchsz,cpb]=distributeby(batchsz,ds.classperbatch);
-  for(i=1:numel(batchsz))
-    if(mod(numel(batchsz{i}),2)==0)
-      batchsz{i}=batchsz{i}(1:2:end)+batchsz{i}(2:2:end);
-    else
-      batchsz{i}=[batchsz{i}(1:2:end-1)+batchsz{i}(2:2:end-1); batchsz{i}(end)];
-    end
-    cpb2{i,1}=repmat(cpb(i),numel(batchsz{i}),1);
+  % batch needs to have a single class label.
+  batch_size=40;
+  allpatches=cell2mat(ds.sample.patches(:));
+  allfeats=cell2mat(ds.sample.feats(:));
+  negfeats=[];
+  negpatches=[];
+  % optionally, get rid of any patches that you want to treat as purely
+  % negative
+  remove=ismember(allpatches(:,7),negative_indices);
+  negpatches=allpatches(remove,:);
+  allpatches(remove,:)=[];
+  negfeats=allfeats(remove,:);
+  allfeats(remove,:)=[];
+  patchlabel=imgs.label(allpatches(:,7));
+  ids=(1:size(allfeats,1))';
+  [allpatches,allfeats,ids,patchlabel]=distributeby(allpatches,allfeats,ids,patchlabel);
+  classperbatch={};
+  for(i=1:numel(allpatches))
+    batchpartition=c(bsxfun(@times,ones(batch_size,1),1:ceil(size(allpatches{i},1)/batch_size)));
+    [allpatches{i},allfeats{i},ids{i}]=distributeby(allpatches{i},allfeats{i},ids{i},batchpartition(1:size(allpatches{i},1)));
+    classperbatch{i}=repmat(patchlabel(i),size(allfeats{i},1),1);
   end
-  batchsz=cell2mat(batchsz)';
-  % store the class label for each batch.
-  ds.classperbatch=cell2mat(cpb2);
-  ds.classperbatch(batchsz==0)=[];
-  batchsz(batchsz==0)=[];
-  initPatches=[structcell2mat(ds.sample.patches(:))];
-  initPatches=[initPatsExtra(:); initPatches];
+  allpatches=cat(1,allpatches{:});
+  allfeats=cat(1,allfeats{:});
+  ids=cat(1,ids{:});
+  ds.classperbatch=cell2mat(classperbatch(:));
+  initPatches=[cell2mat(allpatches);negpatches];
   disp(['sampled ' num2str(size(initPatches,1)) ' patches']);
-  ds.initFeats=cell2mat(ds.sample.feats');
-  ds.initFeats=[initFeatsExtra; ds.initFeats];
+  ds.initFeats=[cell2mat(allfeats);negfeats];
 
   % convert the patch features for each batch into a detector structure.
   ds.detectors=cellfun(@(x,y,z) struct('w',x,'b',y,'id',z),...
-                     mat2cell([ds.initFeats],batchsz,size(ds.initFeats,2)),...
-                     mat2cell(repmat(1,size(ds.initFeats,1),1),batchsz,1),...
-                     mat2cell((1:size(ds.initFeats,1))',batchsz,1),'UniformOutput',false)';
-  initPatches(1:sum(batchsz),6)=1:size(ds.initFeats,1);
+                     allfeats,...
+                     cellfun(@(x) ones(size(x,1),1),allpatches,'UniformOutput',false),...
+                     ids,...
+                     'UniformOutput',false)';
+  initPatches(1:numel(cell2mat(ids)),6)=(1:numel(cell2mat(ids)))';
   ds.initPatches=initPatches;
   % batchfordetr is an n-by-2 detector for the n detectors: column 1 is
   % a detector id, column 2 is the index of the batch containing it.
-  marks=zeros(size(ds.initFeats,1),1);
-  marks(cumsum(batchsz)+1)=1;
-  marks(end)=[];
-  marks(1)=1;
-  ds.batchfordetr=[(1:size(ds.initFeats,1))' cumsum(marks)];
+  ds.batchfordetr=[cell2mat(ids) cell2mat(cellfun(@(x,y) x*0+y,ids,c(num2cell(1:numel(ids))),'UniformOutput',false))];
   dssave();
   dsdelete('ds.sample')
 
@@ -322,11 +335,10 @@ if(~trainingrounds)
       % cache features locally.
       dsmapreduce(['detectors=dsload(''ds.round.detectors'')'';'...
                    'imgs=dsload(''ds.imgs{ds.conf.currimset}'');'...
-                   'dsload(''ds.classperbatch'');'...
+                   'dsload(''ds.classperbatch'');dsload(''ds.negprobperlabel'');'...
                    'posbats=find(imgs.label(ds.round.myiminds(dsidx))==ds.classperbatch);'... % run all detectors whose class matches the class of this image
                    'negbats=find(imgs.label(ds.round.myiminds(dsidx))~=ds.classperbatch);'...
-                   'rp=randperm(numel(negbats));'...
-                   'negbats=negbats(rp(1:min(numel(negbats),numel(posbats)*ds.conf.params.negsperpos)));'... % run a random subset of the detectors for other classes
+                   'negbats=negbats(randsamplewithprob(ds.negprobperlabel(ds.classperbatch(negbats))));'... % run a random subset of the detectors for other classes
                    '[dets,feats]=detectInIm(effstrcell2mat(detectors([posbats(:); negbats(:)])),'...
                                             'ds.round.myiminds(dsidx),'...
                                             'struct(''thresh'',-.02/dsload(''ds.round.ndetrounds''),'...
@@ -362,6 +374,7 @@ if(~trainingrounds)
       % findOverlapping3 finds overlapping clusters--i.e. it performs
       % the agglomerative element clustering step described in the paper.
       dsrundistributed(['dsload(''ds.classperbatch'');dsload(''ds.batchfordetr'');'...
+                        'if(isempty(find(ds.classperbatch==ds.uniquelabels(dsidx)))),return;end,'...
                         '[~,~,ds.round.component{dsidx}]='...
                         'findOverlapping3(''ds.nextround.prevdets'',find(ds.classperbatch==ds.uniquelabels(dsidx)),'...
                         '[ds.batchfordetr(:,1),ds.classperbatch(ds.batchfordetr(:,2))],'...
@@ -374,6 +387,9 @@ if(~trainingrounds)
       toadd=0;
       for(i=1:numel(ds.round.component))
         tmpcomponent=ds.round.component{i};
+        if(numel(tmpcomponent)==0)
+          continue;
+        end
         tmpcomponent(:,2)=tmpcomponent(:,2)+toadd;
         component=[component;tmpcomponent];
         toadd=max(component(:,2));  
@@ -428,7 +444,7 @@ if(~trainingrounds)
     if(roundid>=4)
       % select a subset of the batches to display, since there's too many
       % detectors overall.
-      batchestodisp=1:40:numel(unique(ds.batchfordetr(:,2)));
+      batchestodisp=1:round(numel(unique(ds.batchfordetr(:,2)))/5):numel(unique(ds.batchfordetr(:,2)));
       batchestodisp=batchestodisp(1:min(10,numel(batchestodisp)));
       dets=cell2mat(dsload(['ds.nextround.prevdets{' num2str(batchestodisp) '}'])');
       ovlweights=cell2mat(dsload(['ds.nextround.prevweights{' num2str(batchestodisp) '}'])');

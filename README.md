@@ -16,6 +16,7 @@ General setup:
 
 0) This code is only designed to run on linux.  It might run on a mac or other
    unix system since it only  uses unix commands, but it has not been tested.
+   make sure you clone it with 'git clone --recursive' to pull down dswork.
 
 1) Install libsvm and edit the file 'myaddpath.m' so that it adds libsvm to the path.
 

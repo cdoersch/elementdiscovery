@@ -1,4 +1,6 @@
-% efficient nearest-neighbors in Euclidean distance.
+% efficient nearest-neighbors in dot product space (where 'nearest' means
+% maximizing the dot product).  If nonrm is set to 1, it is standard dot product;
+% otherwise, each datapoint is unit-normalized before computing the dot product.
 % each row of toassign is assigned to the nearest row in targets.
 % closest(i) is the row-index in targets of the closest element 
 % for toassign(i,:).  outdist(i) is the distance to that point.
