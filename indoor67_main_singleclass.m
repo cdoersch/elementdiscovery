@@ -544,9 +544,9 @@ if(~gendpoolfeats)
   ds.finmodel=model;
   dssave;
 
-  % generate a feature vector for each training image
+  % generate a feature vector for each training image in ds.myiminds
   dsrundistributed('dsload(''ds.finmodel'');ds.poolfeats{dsidx}=distGenPooledFeats(ds.finmodel,ds.myiminds(dsidx))',{'ds.myiminds'},struct('noloadresults',true));
-  trainlab=ds.imgs{ds.conf.currimset}.label;
+  trainlab=ds.imgs{ds.conf.currimset}.label(ds.myiminds);
   % switch to the testing set and
   setdataset(20);
   ds.mytestinds=1:numel(ds.imgs{ds.conf.currimset}.fullname);
