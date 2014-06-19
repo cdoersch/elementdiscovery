@@ -80,7 +80,7 @@ if(~finishedinit)
     'whitening', 1, ... % whiten the patch features
     'normbeforewhit', 1, ... % mean-subtract and normalize features before applying whitening
     'normalizefeats', 1, ... % mean-subtract and normalize features after applying whitening
-    'graddescfun', @doGradDescentnrm, ... % function ptr for the optimization function. It gets called
+    'graddescfun', @doGradDescentproj, ... % function ptr for the optimization function. It gets called
                                        ... % on each round of the optimization, including during
                                        ... % initialization.  See doGradDescentproj.m
     'stepsize', .05, ... % step size used by the optimizer
