@@ -80,7 +80,7 @@ if(~finishedinit)
     'whitening', 1, ... % whiten the patch features
     'normbeforewhit', 1, ... % mean-subtract and normalize features before applying whitening
     'normalizefeats', 1, ... % mean-subtract and normalize features after applying whitening
-    'graddescfun', @doGradDescentproj, ... % function ptr for the optimization function. It gets called
+    'graddescfun', @doGradDescentnrm, ... % function ptr for the optimization function. It gets called
                                        ... % on each round of the optimization, including during
                                        ... % initialization.  See doGradDescentproj.m
     'stepsize', .05, ... % step size used by the optimizer
@@ -226,10 +226,8 @@ if(~initmodes)
   ds.classperbatch(batchsz==0)=[];
   batchsz(batchsz==0)=[];
   initPatches=[structcell2mat(ds.sample.patches(:))];
-  initPatches=[initPatsExtra(:); initPatches];
   disp(['sampled ' num2str(size(initPatches,1)) ' patches']);
   ds.initFeats=cell2mat(ds.sample.feats');
-  ds.initFeats=[initFeatsExtra; ds.initFeats];
 
   % convert the patch features for each batch into a detector structure.
   ds.detectors=cellfun(@(x,y,z) struct('w',x,'b',y,'id',z),...
