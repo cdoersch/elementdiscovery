@@ -187,7 +187,7 @@ function [detids,scores,component]=findOverlapping3(datasource,inds,classfordetr
     % linkage2 is a copy of matlab's linkage function.  linkage has a bug
     % a bug that makes it crash on the sorts of inputs I give it.  
     cluststr=linkage2((1:numel(detids))','average',{@(x,y) -links(x,y)+minval});
-    component=cluster(cluststr,'cutoff',minval-conf.maxoverlaps+.001,'criterion','distance');
+    component=cluster(cluststr,'cutoff',max(0,minval-conf.maxoverlaps)+.001,'criterion','distance');
     component2=component;
     %detrrank(ord)=1:numel(ord);
     for(j=unique(component(:)'))
