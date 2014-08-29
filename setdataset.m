@@ -26,7 +26,7 @@ function setdataset(idx,imgs,datadir,labelnames, weburl)
     if(~exist('weburl','var'))
       weburl='';
     end
-    if(~datadir(end)=='/')
+    if(~(datadir(end)=='/'))
       datadir(end+1)='/';
     end
     gbz=struct('labelnames',{labelnames},'imgsurl',weburl,'cutoutdir',datadir);
